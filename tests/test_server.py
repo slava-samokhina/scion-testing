@@ -18,9 +18,9 @@ TEST_PORT = 8099
 os.environ["PORT"] = str(TEST_PORT)
 os.environ["HOST"] = "127.0.0.1"
 
-# Import server
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from backend.server import TaskRequestHandler, ReusableTCPServer, init_db, DB_PATH
+TEST_DB_PATH = Path(__file__).resolve().parent.parent / "test_tasks.db"
+import backend.server as server_mod
+server_mod.DB_PATH = TEST_DB_PATH
 
 
 class TestTaskBoardServer(unittest.TestCase):
@@ -38,9 +38,9 @@ class TestTaskBoardServer(unittest.TestCase):
     def tearDownClass(cls):
         cls.httpd.shutdown()
         cls.httpd.server_close()
-        if DB_PATH.exists():
+        if TEST_DB_PATH.exists():
             try:
-                DB_PATH.unlink()
+                TEST_DB_PATH.unlink()
             except Exception:
                 pass
 
