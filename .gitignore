@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+.agents/
+.scion/
+node_modules/
+.env
+EOF
