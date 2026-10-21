@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scion Task Board Demo</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">📋</div>
+        <div>
+          <h1>Task Board Demo</h1>
+          <p class="subtitle">Live Progress Demo via <span class="badge-code">sciontool expose</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="connection-status" id="connectionStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Hub Proxy Active</span>
+        </div>
+        <button class="btn btn-secondary" id="resetBtn" title="Reset to sample tasks">↻ Reset Data</button>
+        <button class="btn btn-primary" id="openAddModalBtn">+ Add Task</button>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Total Tasks</span>
+        <span class="stat-value" id="statTotal">0</span>
+      </div>
+      <div class="stat-card stat-todo">
+        <span class="stat-label">To Do</span>
+        <span class="stat-value" id="statTodo">0</span>
+      </div>
+      <div class="stat-card stat-progress">
+        <span class="stat-label">In Progress</span>
+        <span class="stat-value" id="statProgress">0</span>
+      </div>
+      <div class="stat-card stat-done">
+        <span class="stat-label">Completed</span>
+        <span class="stat-value" id="statDone">0</span>
+      </div>
+    </section>
+
+    <!-- Filter & Search Toolbar -->
+    <section class="toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search tasks by title or description..." />
+      </div>
+      <div class="filter-group">
+        <label for="priorityFilter">Priority:</label>
+        <select id="priorityFilter">
+          <option value="all">All Priorities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Kanban Board -->
+    <main class="board-grid">
+      <!-- Column: To Do -->
+      <div class="column" data-status="todo">
+        <div class="column-header">
+          <div class="column-title">
+            <span class="column-indicator col-todo"></span>
+            <h3>To Do</h3>
+          </div>
+          <span class="column-count" id="countTodo">0</span>
+        </div>
+        <div class="card-list" id="listTodo">
+          <!-- Task cards injected here -->
+        </div>
+      </div>
+
+      <!-- Column: In Progress -->
+      <div class="column" data-status="in_progress">
+        <div class="column-header">
+          <div class="column-title">
+            <span class="column-indicator col-progress"></span>
+            <h3>In Progress</h3>
+          </div>
+          <span class="column-count" id="countProgress">0</span>
+        </div>
+        <div class="card-list" id="listProgress">
+          <!-- Task cards injected here -->
+        </div>
+      </div>
+
+      <!-- Column: Done -->
+      <div class="column" data-status="done">
+        <div class="column-header">
+          <div class="column-title">
+            <span class="column-indicator col-done"></span>
+            <h3>Completed</h3>
+          </div>
+          <span class="column-count" id="countDone">0</span>
+        </div>
+        <div class="card-list" id="listDone">
+          <!-- Task cards injected here -->
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Powered by <strong>Scion Agent Orchestration</strong> &bull; Exposed Port: <code>8000</code> &bull; REST API at <code>/api/tasks</code></p>
+    </footer>
+  </div>
+
+  <!-- Modal for Add/Edit Task -->
+  <div class="modal-backdrop" id="taskModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Create New Task</h3>
+        <button class="modal-close" id="closeModalBtn">&times;</button>
+      </div>
+      <form id="taskForm">
+        <input type="hidden" id="taskId" />
+        <div class="form-group">
+          <label for="taskTitle">Task Title *</label>
+          <input type="text" id="taskTitle" required placeholder="e.g. Implement user authentication" />
+        </div>
+        <div class="form-group">
+          <label for="taskDescription">Description</label>
+          <textarea id="taskDescription" rows="3" placeholder="Provide details, acceptance criteria, or notes..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskStatus">Status</label>
+            <select id="taskStatus">
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskPriority">Priority</label>
+            <select id="taskPriority">
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveTaskBtn">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
