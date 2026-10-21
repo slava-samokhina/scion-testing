@@ -1,0 +1,186 @@
+name: UAT PR Checks
+
+# Automated gate (no human here). Runs on promotion PRs opened by the Scion
+# App's bot against release/uat/**. All jobs are required status checks on the
+# `main` branch ruleset; the PR auto-merges only when every one is green.
+#
+# Read-only: authenticates to GCP via Workload Identity Federation but never
+# writes, deploys, or attests. The single human gate lives in uat-promote.yml
+# (the `uat` environment approval).
+
+on:
+  pull_request:
+    paths:
+      - "release/uat/**"
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
+concurrency:
+  group: uat-pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Check 4 — only release/uat/** changed (no sneaking code into a promotion PR).
+  check-paths:
+    name: "Check 4 — only release/uat/** changed"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Assert every changed file is under release/uat/
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD")"
+          echo "Changed files:"; echo "$CHANGED"
+          BAD="$(echo "$CHANGED" | grep -v '^release/uat/' || true)"
+          if [ -n "$BAD" ]; then
+            echo "::error::Promotion PRs may only touch release/uat/**. Offending files:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "OK — only release/uat/** changed."
+
+  # Check 6 — PR author is the Scion automation bot.
+  check-author:
+    name: "Check 6 — PR author is the promotion agent"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - name: Assert author == PROMOTION_AGENT_LOGIN
+        run: |
+          set -euo pipefail
+          ACTUAL="${{ github.event.pull_request.user.login }}"
+          EXPECTED="${{ vars.PROMOTION_AGENT_LOGIN }}"
+          echo "PR author: $ACTUAL (expected: $EXPECTED)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::PR must be opened by the Scion promotion agent ($EXPECTED)."
+            exit 1
+          fi
+          echo "OK — opened by the Scion automation."
+
+  # Check 1 — the promoted dev digest actually exists in the dev AR repo.
+  check-digest:
+    name: "Check 1 — dev digest exists in apps"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PROMOTER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Describe each promoted image digest in the dev repo
+        run: |
+          set -euo pipefail
+          for f in release/uat/*.json; do
+            APP="$(jq -r .app "$f")"
+            DIGEST="$(jq -r .dev_digest "$f")"
+            IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.DEV_PROJECT_ID }}/${{ vars.DEV_AR_REPO }}/${APP}@${DIGEST}"
+            echo "Verifying $IMAGE"
+            gcloud artifacts docker images describe "$IMAGE" \
+              --project="${{ vars.DEV_PROJECT_ID }}" >/dev/null
+            echo "OK — $APP digest present in ${{ vars.DEV_AR_REPO }}."
+          done
+
+  # Check 2 — provenance: a dev Binary Authorization attestation exists for the digest.
+  check-provenance:
+    name: "Check 2 — dev attestation present"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PROMOTER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Assert a dev attestation exists for each digest
+        run: |
+          set -euo pipefail
+          for f in release/uat/*.json; do
+            APP="$(jq -r .app "$f")"
+            DIGEST="$(jq -r .dev_digest "$f")"
+            IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.DEV_PROJECT_ID }}/${{ vars.DEV_AR_REPO }}/${APP}@${DIGEST}"
+            echo "Checking attestation for $IMAGE"
+            COUNT="$(gcloud container binauthz attestations list \
+              --project="${{ vars.DEV_PROJECT_ID }}" \
+              --attestor="${{ vars.ATTESTOR }}" \
+              --attestor-project="${{ vars.DEV_PROJECT_ID }}" \
+              --artifact-url="$IMAGE" \
+              --format='value(name)' 2>/dev/null | wc -l | tr -d ' ')"
+            if [ "$COUNT" -lt 1 ]; then
+              echo "::error::No dev attestation for $APP. Is Scion signing dev images? (See scion-deployer-binauthz-additions.) Comment out Check 2 if not yet signing."
+              exit 1
+            fi
+            echo "OK — $APP has a dev attestation."
+          done
+
+  # Check 3 — no CRITICAL vulnerabilities in the image being promoted.
+  check-vulns:
+    name: "Check 3 — no critical vulnerabilities"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PROMOTER_SA }}
+          token_format: access_token
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin v0.58.1
+          trivy --version
+      - name: Scan each promoted image for CRITICAL vulns
+        env:
+          TRIVY_USERNAME: oauth2accesstoken
+          TRIVY_PASSWORD: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          for f in release/uat/*.json; do
+            APP="$(jq -r .app "$f")"
+            DIGEST="$(jq -r .dev_digest "$f")"
+            IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.DEV_PROJECT_ID }}/${{ vars.DEV_AR_REPO }}/${APP}@${DIGEST}"
+            echo "Scanning $IMAGE"
+            trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed \
+              --no-progress "$IMAGE"
+            echo "OK — $APP has no un-ignored CRITICAL vulns."
+          done
+
+  # Check 5 — the UAT infrastructure the promote job needs actually exists.
+  check-uat-infra:
+    name: "Check 5 — uat infra exists"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS) }}
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PROMOTER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Verify UAT AR repo, SAs, and attestor exist
+        run: |
+          set -euo pipefail
+          echo "Artifact Registry repo ${{ vars.UAT_AR_REPO }}..."
+          gcloud artifacts repositories describe "${{ vars.UAT_AR_REPO }}" \
+            --project="${{ vars.UAT_PROJECT_ID }}" \
+            --location="${{ vars.GCP_REGION }}" >/dev/null
+          echo "Promoter SA..."
+          gcloud iam service-accounts describe "${{ vars.PROMOTER_SA }}" \
+            --project="${{ vars.UAT_PROJECT_ID }}" >/dev/null
+          echo "UAT runtime SA..."
+          gcloud iam service-accounts describe "${{ vars.UAT_RUNTIME_SA }}" \
+            --project="${{ vars.UAT_PROJECT_ID }}" >/dev/null
+          echo "Attestor ${{ vars.ATTESTOR }}..."
+          gcloud container binauthz attestors describe "${{ vars.ATTESTOR }}" \
+            --project="${{ vars.UAT_PROJECT_ID }}" >/dev/null
+          echo "OK — UAT infrastructure is present."
