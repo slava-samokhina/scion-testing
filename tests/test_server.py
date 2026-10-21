@@ -26,8 +26,8 @@ server_mod.DB_PATH = TEST_DB_PATH
 class TestTaskBoardServer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        init_db()
-        cls.httpd = ReusableTCPServer(("127.0.0.1", TEST_PORT), TaskRequestHandler)
+        server_mod.init_db()
+        cls.httpd = server_mod.ReusableTCPServer(("127.0.0.1", TEST_PORT), server_mod.TaskRequestHandler)
         cls.thread = threading.Thread(target=cls.httpd.serve_forever)
         cls.thread.daemon = True
         cls.thread.start()
