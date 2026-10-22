@@ -1,6 +1,6 @@
 {
   "app": "scion-testing",
-  "dev_digest": "sha256:9703d5ab091dd2c3e7a5e76885030a01ebc14144f1166ce496f62c522e7851de",
-  "release": "uat/scion-testing/2026.10.21-1",
-  "promoted_at": "2026-10-21T20:30:00Z"
+  "dev_digest": "sha256:e63cf4d45f235978e0b55d1009c42f85e0956852300fb3f1deb1830f0911dec5",
+  "release": "uat/scion-testing/20261022-162850",
+  "promoted_at": "2026-10-22T16:28:50Z"
 }
