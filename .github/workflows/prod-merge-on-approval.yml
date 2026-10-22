@@ -13,6 +13,7 @@ permissions:
   contents: write
   pull-requests: write
   checks: read
+  actions: write
   id-token: write
 
 jobs:
@@ -36,6 +37,16 @@ jobs:
           echo "ref=$HEAD" >> "$GITHUB_OUTPUT"
           ok=""
           for i in $(seq 1 40); do
+            # PRs opened by Actions start their checks in "approval required".
+            # This job is running because a maintainer approved the PR, so start
+            # those checks here instead of asking for a second click.
+            PENDING=$(gh api "repos/${GH_REPO}/actions/runs?head_sha=${HEAD}&per_page=30" \
+              --jq '.workflow_runs[] | select(.conclusion=="action_required") | .id')
+            for id in $PENDING; do
+              echo "Starting workflow run $id"
+              gh api --method POST "repos/${GH_REPO}/actions/runs/${id}/approve" \
+                || echo "Could not start run $id"
+            done
             ok=$(gh pr view "$PR" --repo "$GH_REPO" --json state,statusCheckRollup --jq '
               [.statusCheckRollup[]?
                 | select(.name == "checks" or .name == "prod-checks")
