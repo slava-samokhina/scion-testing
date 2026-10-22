@@ -37,3 +37,5 @@ sciontool expose 8000 --label demo-task-board
 # List exposed ports and view the live Hub proxy URL
 sciontool expose --list
 ```
+
+<!-- codeowners validation: dev PR should not be gated -->
