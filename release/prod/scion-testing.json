@@ -2,6 +2,6 @@
   "app": "scion-testing",
   "uat_digest": "sha256:e63cf4d45f235978e0b55d1009c42f85e0956852300fb3f1deb1830f0911dec5",
   "uat_release": "uat/scion-testing/20261022-180000",
-  "release": "prod/scion-testing/20261022-191222",
-  "promoted_at": "2026-10-22T19:12:22Z"
+  "release": "prod/scion-testing/20261022-193402",
+  "promoted_at": "2026-10-22T19:34:02Z"
 }
