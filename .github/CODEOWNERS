@@ -7,3 +7,7 @@
 # This is the single human gate for UAT: a promotion PR (which only changes
 # release/uat/**) must be approved by an owner before it can auto-merge and deploy.
 /release/uat/ @slava-samokhina
+
+# Same gate for prod. Only PRs that touch release/prod/** need this approval.
+# Dev PRs and UAT promotion PRs do not.
+/release/prod/ @slava-samokhina
