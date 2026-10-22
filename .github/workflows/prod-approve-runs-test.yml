@@ -1,0 +1,17 @@
+name: Test workflow-run approval token
+on:
+  workflow_dispatch:
+permissions:
+  actions: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Try to approve an already-started run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set +e
+          gh api --method POST "repos/${GH_REPO}/actions/runs/39842326946/approve" --include
+          echo "exit=$?"
