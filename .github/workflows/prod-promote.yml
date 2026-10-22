@@ -14,6 +14,16 @@ on:
     branches: [main]
     paths:
       - "release/prod/**"
+  # Also invoked by prod-merge-on-approval.yml. A merge performed by this
+  # repo's GITHUB_TOKEN does not emit a push event, so the approval workflow
+  # calls this directly after it merges.
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to deploy. Defaults to the calling workflow's SHA.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -30,6 +40,8 @@ jobs:
     environment: prod
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - id: auth
         name: Authenticate to GCP (WIF, keyless)

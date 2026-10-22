@@ -80,9 +80,9 @@ jobs:
             "- Digest (unchanged, no rebuild): \`${DIGEST}\`" \
             "- Tag: \`${TAG}\`" \
             "" \
-            "Merging this PR deploys that exact digest to prod. Approve it as code owner, then merge it from this page. A merge performed by this workflow would not start the deploy." \
+            "Approving this PR as code owner merges it and deploys that exact digest to prod." \
             "" \
-            "If the checks have not started, use **Approve workflows to run** on this PR. GitHub requires that when Actions itself opened the pull request.")
+            "If the checks have not started, use **Approve workflows to run** first. GitHub requires that when Actions itself opened the pull request. Then approve the PR. You do not need to merge it yourself.")
           gh pr create --base main --head "$BRANCH" \
             --title "Promote ${APP} to prod — ${VERSION}" \
             --body "$BODY"
