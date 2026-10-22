@@ -27,23 +27,29 @@ jobs:
         id: result
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # GH_REPO lets gh run without a checkout. This job has no .git directory.
           echo "ref=$HEAD" >> "$GITHUB_OUTPUT"
           ok=""
           for i in $(seq 1 40); do
-            ok=$(gh pr view "$PR" --json state,statusCheckRollup --jq '
+            ok=$(gh pr view "$PR" --repo "$GH_REPO" --json state,statusCheckRollup --jq '
               [.statusCheckRollup[]?
                 | select(.name == "checks" or .name == "prod-checks")
                 | .conclusion] as $c
               | if .state != "OPEN" then "closed"
                 elif ($c | length) < 2 then "wait"
                 elif ($c | all(. == "SUCCESS")) then "ready"
-                elif ($c | any(. == "FAILURE" or . == "CANCELLED" or . == "TIMED_OUT")) then "fail"
+                elif ($c | any(. == "FAILURE" or . == "CANCELLED" or . == "TIMED_OUT" or . == "ACTION_REQUIRED")) then
+                  if ($c | any(. == "ACTION_REQUIRED")) then "approve-workflows" else "fail" end
                 else "wait" end')
             echo "attempt $i: $ok"
+            if [ "$ok" = "approve-workflows" ]; then
+              echo "Checks are waiting. On the PR, click Approve workflows to run."
+            fi
             [ "$ok" = "ready" ] || [ "$ok" = "closed" ] || [ "$ok" = "fail" ] && break
             sleep 15
           done
@@ -57,7 +63,7 @@ jobs:
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          gh pr merge "$PR" --squash --delete-branch
+          gh pr merge "$PR" --repo "$GH_REPO" --squash --delete-branch
           echo "should_deploy=true" >> "$GITHUB_OUTPUT"
 
   deploy:
