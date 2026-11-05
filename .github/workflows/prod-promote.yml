@@ -2,8 +2,8 @@ name: PROD Promote
 
 # Fires after a prod promotion PR auto-merges to main (release/prod/** changed).
 # The agent opens that PR with auto-merge. CODEOWNERS approval plus the
-# prod-checks status are both required before GitHub merges. This job does not
-# pause: `environment: prod` is only a deployment record.
+# uat-checks and prod-checks statuses are both required before GitHub merges.
+# This job does not pause: `environment: prod` is only a deployment record.
 #
 # Copies the UAT image digest-for-digest into apps-prod, re-attests the new
 # prod image URL (Binary Authorization matches the full URL), deploys, and
