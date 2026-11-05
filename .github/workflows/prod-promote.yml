@@ -1,9 +1,9 @@
 name: PROD Promote
 
-# Fires after a prod promotion PR is merged to main (release/prod/** changed).
-# The human gate already happened on that PR (CODEOWNERS on /release/prod/).
-# This job does not pause again: `environment: prod` is only a deployment
-# record, with no required reviewers and no variables of its own.
+# Fires after a prod promotion PR auto-merges to main (release/prod/** changed).
+# The agent opens that PR with auto-merge. CODEOWNERS approval plus the
+# prod-checks status are both required before GitHub merges. This job does not
+# pause: `environment: prod` is only a deployment record.
 #
 # Copies the UAT image digest-for-digest into apps-prod, re-attests the new
 # prod image URL (Binary Authorization matches the full URL), deploys, smokes
@@ -14,16 +14,6 @@ on:
     branches: [main]
     paths:
       - "release/prod/**"
-  # Also invoked by prod-merge-on-approval.yml. A merge performed by this
-  # repo's GITHUB_TOKEN does not emit a push event, so the approval workflow
-  # calls this directly after it merges.
-  workflow_call:
-    inputs:
-      ref:
-        description: Commit to deploy. Defaults to the calling workflow's SHA.
-        type: string
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -40,8 +30,6 @@ jobs:
     environment: prod
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref || github.sha }}
 
       - id: auth
         name: Authenticate to GCP (WIF, keyless)
